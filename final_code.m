@@ -3,8 +3,10 @@ function main()
     [gridSize, startPos, mapGrid,radiationMap,radiationGrid, occupancyGrid,logOddsOGM,ax] = initialize_environment();
 
     % Call the exploration function
+    %pause(10);
     explore_grid_multi(gridSize, startPos, mapGrid,radiationMap,radiationGrid, occupancyGrid,logOddsOGM,ax);
 end
+
 
 
 
@@ -51,16 +53,6 @@ function [sensorData, visibleCells, costMap, parentMap, radiationMap, occupancyG
                 radiationMap(targetRow, targetCol) = radiationGrid(targetRow, targetCol);
 
                 % Update Dijkstra's cost map for shortest path
-                currentCost = costMap(robotPos(1), robotPos(2)) + abs(rows(i)) + abs(cols(i));
-                if occupancyGrid(targetRow,targetCol) < 0.9 
-                    if currentCost < costMap(targetRow, targetCol)
-                        costMap(targetRow, targetCol) = currentCost;
-                        parentMap(targetRow, targetCol) = sub2ind(gridSize, robotPos(1), robotPos(2));
-                    end
-                else
-                    costMap(targetRow, targetCol) = inf;
-                    parentMap(targetRow, targetCol) = sub2ind(gridSize, robotPos(1), robotPos(2));
-                end
             
                 
             end
@@ -150,15 +142,14 @@ function path = construct_bfs_path(parent, target, start)
     % Reconstruct the path from BFS parent map
     path = target;
 
-
     while ~isequal(path(1, :), start)
         currentStr = mat2str(path(1, :));
         parentStr = mat2str(parent(currentStr));
         parentCell = sscanf(parentStr, '[%d %d]'); % Convert string back to array
         path = [reshape(parentCell, 1, 2); path];
     end
-
     path = path(2, :); % Return the next step
+    
 end
 
 
@@ -496,7 +487,7 @@ function voronoiRegions = compute_voronoi_regions(robotPositions, gridSize, occu
     for i = 1:numRobots
         % Calculate distance to robot i; add large penalty for obstacles
         distances(:, :, i) = sqrt((X - robotPositions(i, 2)).^2 + (Y - robotPositions(i, 1)).^2) + ...
-                             1e6 * (occupancyGrid > 0.7); % High cost for obstacles
+                             1e6 * (occupancyGrid > 0.8); % High cost for obstacles
     end
     
     % Assign each cell to the closest robot
@@ -699,10 +690,13 @@ function path = bfs_to_frontier(robotPos, frontiers, occupancyGrid)
 
         % Check if the current cell is a frontier
         if isKey(frontierSet, mat2str(current))
-            % Reconstruct path to this frontier
-            % if parentMap.Count == 1
-            %     show_occupancy_grid_values(voronoi);
-            % end
+
+            if parentMap.Count == 1
+                path=[];
+                return;
+            end
+
+
             path = construct_bfs_path(parentMap, current, robotPos);
             return;
         end
@@ -712,7 +706,7 @@ function path = bfs_to_frontier(robotPos, frontiers, occupancyGrid)
             neighbor = current + d';
             if neighbor(1) > 0 && neighbor(1) <= gridSize(1) && ...
                neighbor(2) > 0 && neighbor(2) <= gridSize(2) && ...
-               occupancyGrid(neighbor(1), neighbor(2)) < 0.9 && ... % Not a wall
+               occupancyGrid(neighbor(1), neighbor(2)) < 0.8 && ... % Not a wall
                ~isKey(parentMap, mat2str(neighbor))
                 queue{end + 1} = neighbor; % Add to queue
                 parentMap(mat2str(neighbor)) = current; % Mark as visited
@@ -826,7 +820,7 @@ end
 function validate_exploration_results(gridSize, trueMap, occupancyGrid, logOddsOGM)
     % Metrics for validation
     numCells = numel(trueMap);
-    correctPredictions = sum((trueMap(:) == 1 & occupancyGrid(:) > 0.7) | (trueMap(:) == 0 & occupancyGrid(:) < 0.3));
+    correctPredictions = sum((trueMap(:) == 1 & occupancyGrid(:) > 0.7) | (trueMap(:) == 0 & occupancyGrid(:) < 0.3) | (trueMap(:) == 0.5 & occupancyGrid(:) < 0.3));
     falsePositives = sum(trueMap(:) == 0 & occupancyGrid(:) > 0.7);
     falseNegatives = sum(trueMap(:) == 1 & occupancyGrid(:) < 0.3);
     
